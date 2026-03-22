@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rappi Menu AI | Final Build Hyper-Sync</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script>tailwind.config={theme:{extend:{colors:{rappi:{DEFAULT:'#FF5000',dark:'#E64800'},darkRappi:'#1A1A24',deepBlack:'#000000'},fontFamily:{sans:['Montserrat','sans-serif']}}}}</script>
+    <style>
+        body,html{margin:0;padding:0;overflow:hidden;width:100%;height:100%;background-color:#000}
+        #three-canvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;transition:opacity 1.5s ease}
+        .ui-layer{position:relative;z-index:10;width:100%;height:100vh;overflow-y:auto;overflow-x:hidden}
+        .glass-card{background:rgba(255,255,255,0.98);backdrop-filter:blur(40px);box-shadow:0 60px 150px -20px rgba(0,0,0,0.9);border-radius:4rem;padding:4rem;transition:all 0.8s cubic-bezier(0.7,0,0.3,1)}
+        .warp-active .glass-card{transform:scale(0.5) translateY(200px);opacity:0;filter:blur(20px)}
+        .spaceship-container{perspective:1000px;animation:shipFloat 3s ease-in-out infinite}
+        @keyframes shipFloat{0%,100%{transform:translateY(0) rotateX(15deg) rotateZ(0deg)}50%{transform:translateY(-40px) rotateX(-5deg) rotateZ(3deg)}}
+        .engine-glow{fill:#FF5000;filter:drop-shadow(0 0 15px #FF5000);animation:pulseGlow 0.15s ease-in-out infinite alternate}
+        @keyframes pulseGlow{from{opacity:0.5;transform:scale(0.8)}to{opacity:1;transform:scale(1.2)}}
+        .galactic-bar{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);height:14px;border-radius:7px;overflow:hidden}
+        .galactic-progress{background:linear-gradient(90deg,#FF5000,#ff9e00);box-shadow:0 0 30px #FF5000;transition:width 0.4s ease}
+        .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(250px);background:#10b981;color:white;padding:20px 40px;border-radius:24px;font-weight:800;z-index:2000;transition:transform 0.5s ease;min-width:400px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.5)}
+        .toast.show{transform:translateX(-50%) translateY(0)}
+        #drop-zone{background:radial-gradient(circle at var(--x,50%) var(--y,50%),rgba(255,80,0,0.15) 0%,transparent 60%),#f8fafc;border:4px dashed #e2e8f0;border-radius:4rem;transition:all 0.3s ease}
+        #drop-zone.drag-over{border-color:#FF5000;background-color:rgba(255,80,0,0.05);transform:scale(1.02)}
+        .step-number{background:#FF5000;color:white;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px}
+        #loading-space-view{background:transparent!important}
+        .rappi-table th{padding:1.5rem 1rem;line-height:1.2}
+    </style>
+</head>
+<body class="font-sans antialiased text-slate-900 bg-black">
+<canvas id="three-canvas"></canvas>
+<div id="toast-msg" class="toast">🚀 Misión Sincronizada</div>
+<div class="ui-layer">
+    <div id="login-view" class="min-h-screen flex items-center justify-center p-4">
+        <div class="glass-card max-w-md w-full text-center">
+            <div class="mb-8 inline-block bg-rappi/10 p-8 rounded-full"><span class="text-6xl">🛸</span></div>
+            <h2 class="text-7xl font-black text-rappi leading-none mb-2 tracking-tighter">Rappi</h2>
+            <h1 class="text-2xl font-black tracking-[0.4em] uppercase text-darkRappi opacity-60 mb-10">Menu AI</h1>
+            <p class="text-slate-500 mb-12 font-medium italic leading-relaxed uppercase text-[10px] tracking-[0.2em] leading-loose">Exactitud de Datos y Precios <br> Activos Fotográficos Sony Pro (ZIP)</p>
+            <button id="btn-ingresar" class="w-full bg-darkRappi text-white py-7 rounded-[2.5rem] font-black uppercase tracking-[0.2em] hover:bg-rappi hover:scale-105 transition-all shadow-2xl shadow-rappi/40">Ingresar al Portal</button>
+        </div>
+    </div>
+    <div id="app-view" class="hidden min-h-screen flex flex-col bg-white">
+        <nav class="bg-white border-b border-slate-100 p-8 flex justify-between items-center sticky top-0 z-50">
+            <div class="flex items-center gap-2 cursor-pointer" onclick="location.reload()">
+                <span class="font-black text-3xl text-rappi italic">Rappi</span>
+                <span class="font-black text-xl text-darkRappi ml-[-5px]">Menu</span>
+            </div>
+            <div class="w-12 h-12 rounded-full bg-rappi text-white flex items-center justify-center font-bold shadow-xl border-2 border-white">S</div>
+        </nav>
+        <main class="max-w-6xl mx-auto w-full p-12 flex-grow">
+            <section id="upload-section">
+                <div class="text-center mb-20">
+                    <h3 class="text-6xl font-black text-slate-800 tracking-tighter uppercase mb-8 italic text-rappi">Misión Digitalización</h3>
+                    <div class="max-w-md mx-auto">
+                        <label class="block text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] mb-4 text-center">Nombre del Restaurante</label>
+                        <input type="text" id="restaurant-name" placeholder="INGRESE EL NOMBRE DEL COMERCIO" class="w-full border-2 border-slate-100 rounded-[2.5rem] p-8 text-center text-2xl font-black uppercase focus:border-rappi outline-none transition-all shadow-sm">
+                    </div>
+                </div>
+                <div id="drop-zone" class="p-32 text-center cursor-pointer relative overflow-hidden group">
+                    <input type="file" id="file-input" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*,application/pdf">
+                    <div class="text-9xl mb-12 group-hover:scale-110 transition-transform">📸</div>
+                    <h3 class="text-4xl font-black text-slate-800 uppercase tracking-tighter text-center">Sube el Manifiesto</h3>
+                    <p class="text-slate-400 font-bold uppercase text-xs tracking-[0.4em] mt-6 italic text-center leading-loose">Extracción Exacta de Precios <br> Generación de Carpeta de Fotos Sony Pro</p>
+                </div>
+            </section>
+        </main>
+    </div>
+    <div id="loading-space-view" class="hidden fixed inset-0 z-[100] flex flex-col items-center justify-center pointer-events-none">
+        <div class="spaceship-container w-80 h-80 mb-20 relative">
+            <svg viewBox="0 0 240 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M220 60C220 85 180 110 120 110C60 110 20 85 20 60C20 35 60 10 120 10C180 10 220 35 220 60Z" fill="white" fill-opacity="0.98"/>
+                <path d="M140 15C140 15 130 5 120 5C110 5 100 15 100 15" stroke="#FF5000" stroke-width="6" stroke-linecap="round"/>
+                <circle cx="30" cy="60" r="16" class="engine-glow"/>
+                <circle cx="210" cy="60" r="16" class="engine-glow"/>
+            </svg>
+        </div>
+        <div class="max-w-2xl w-full px-16 text-center">
+            <h2 id="loading-perc" class="text-9xl font-black text-white italic mb-6 tracking-tighter drop-shadow-[0_0_50px_rgba(255,80,0,1)]">0%</h2>
+            <div class="galactic-bar mb-10 p-1.5"><div id="loading-bar" class="galactic-progress h-full rounded-full" style="width:0%"></div></div>
+            <div class="flex flex-col items-center">
+                <p class="text-white/40 font-black uppercase text-[12px] tracking-[0.7em] mb-8">Sincronización Cuántica en Curso</p>
+                <p id="loading-status" class="text-rappi font-black text-2xl uppercase tracking-tighter italic animate-pulse text-center">Interpretando Precios y Productos...</p>
+            </div>
+        </div>
+    </div>
+    <div id="results-view" class="hidden min-h-screen bg-white relative z-10 flex flex-col p-12 text-slate-900">
+        <div class="max-w-full mx-auto w-full">
+            <div class="flex flex-col xl:flex-row justify-between items-center border-b border-slate-100 pb-12 mb-12 gap-10">
+                <div>
+                    <h2 class="text-6xl font-black text-slate-800 tracking-tighter uppercase italic leading-none">Menú Extraído</h2>
+                    <p class="text-slate-400 font-bold uppercase text-[11px] tracking-[0.5em] mt-5 italic">Precisión del 100% en Datos de Rappi</p>
+                </div>
+                <div class="flex flex-wrap gap-6">
+                    <button id="btn-download-zip" class="bg-blue-600 text-white font-black px-12 py-7 rounded-[2.5rem] text-[12px] uppercase hover:bg-blue-700 transition-all shadow-2xl flex items-center gap-4 group active:scale-95">
+                        <span class="text-2xl group-hover:scale-125 transition-transform">📦</span>
+                        <span>Descargar Carpeta Sony Pro (ZIP)</span>
+                    </button>
+                    <button onclick="location.reload()" class="bg-slate-100 text-slate-400 font-black px-10 py-7 rounded-[2.5rem] text-[11px] uppercase hover:bg-slate-200 transition-all">Nueva Misión</button>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-20">
+                <div class="bg-slate-50 p-14 rounded-[4.5rem] border border-slate-100 flex flex-col items-center text-center group">
+                    <div class="step-number mb-8 shadow-lg shadow-rappi/30">1</div>
+                    <h4 class="font-black uppercase text-xl mb-6">Copiar para Rappi Sheets</h4>
+                    <p class="text-[11px] text-slate-500 font-medium mb-10 leading-relaxed italic">Nombres exactos (max 5) | Corredores únicos <br> Precios verificados.</p>
+                    <button id="btn-copy" class="w-full bg-rappi text-white font-black py-8 rounded-[3rem] text-xs uppercase hover:bg-rappi-dark transition-all transform active:scale-95 shadow-xl shadow-rappi/20">Copiar Datos (Celda B2)</button>
+                </div>
+                <div class="bg-slate-50 p-14 rounded-[4.5rem] border border-slate-100 flex flex-col items-center text-center">
+                    <div class="step-number mb-8 shadow-lg shadow-slate-400/30">2</div>
+                    <h4 class="font-black uppercase text-xl mb-6">Abre la Hoja de Registro</h4>
+                    <p class="text-[11px] text-slate-500 font-medium mb-10 leading-relaxed italic">Este enlace forzará la creación de una <br> copia nueva e independiente.</p>
+                    <a href="https://docs.google.com/spreadsheets/d/1YYu6rhgiBzlItp5JGty5yIfw6fQ3k7XUwgvg2yZQSvA/copy" target="_blank" class="w-full bg-darkRappi text-white font-black py-8 rounded-[3rem] text-xs uppercase hover:bg-black transition-all transform active:scale-95 shadow-xl">Obtener Nueva Plantilla</a>
+                </div>
+            </div>
+            <div class="bg-white rounded-[4.5rem] shadow-2xl border border-slate-100 overflow-hidden mb-24">
+                <div class="overflow-x-auto">
+                    <table id="rappi-table" class="rappi-table w-full text-left border-collapse text-xs">
+                        <thead class="bg-slate-50/70 border-b border-slate-100">
+                            <tr>
+                                <th class="uppercase font-black text-slate-400 text-[10px]">Corredor<br>(max. 3 palabras)</th>
+                                <th class="uppercase font-black text-slate-400 text-[10px]">Nombre del Plato<br>(max. 5 palabras)</th>
+                                <th class="uppercase font-black text-slate-400 text-[10px] w-1/3">Descripción<br>(max. 40 palabras)</th>
+                                <th class="uppercase font-black text-slate-800 text-[11px]">Precio</th>
+                                <th class="uppercase font-black text-slate-400 text-[9px]">Elecciones obligatorias del producto (opcional)</th>
+                                <th class="uppercase font-black text-slate-400 text-[9px]">Ingredientes agregar (opcional)</th>
+                                <th class="uppercase font-black text-slate-400 text-[9px]">Ingredientes quitar (opcional)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+const apiKey="AIzaSyCggszdS_SPtQXAHqubU8LJZjvLh2fxN1I";let menuData={platos:[],bebidas:[]};let scene,camera,renderer,starGroup,warpSpeed=1.8;
+function init3D(){scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,5000);renderer=new THREE.WebGLRenderer({canvas:document.getElementById('three-canvas'),antialias:true,alpha:true});renderer.setSize(window.innerWidth,window.innerHeight);renderer.setClearColor(0x000000,1);starGroup=new THREE.Group();scene.add(starGroup);for(let i=0;i<13000;i++){const color=Math.random()>0.4?0xFF5000:0xFFFFFF;const star=new THREE.Mesh(new THREE.SphereGeometry(Math.random()*0.55+0.1,6,6),new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.95}));star.position.set((Math.random()-0.5)*4000,(Math.random()-0.5)*4000,(Math.random()-0.5)*3500);star.userData.speedZ=Math.random()*2.2+0.6;starGroup.add(star)}camera.position.z=250;animate()}
+function animate(){requestAnimationFrame(animate);starGroup.children.forEach(s=>{s.position.z+=s.userData.speedZ*warpSpeed;if(s.position.z>800)s.position.z=-2800;s.scale.z=warpSpeed>10?250:1});renderer.render(scene,camera)}
+document.getElementById('btn-ingresar').addEventListener('click',()=>{warpSpeed=110;document.body.classList.add('warp-active');setTimeout(()=>{document.getElementById('login-view').classList.add('hidden');document.getElementById('app-view').classList.remove('hidden');warpSpeed=2.8},800)});
+const dropZone=document.getElementById('drop-zone');const fileInput=document.getElementById('file-input');
+['dragenter','dragover','dragleave','drop'].forEach(e=>dropZone.addEventListener(e,ev=>{ev.preventDefault();ev.stopPropagation()}));
+['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev,()=>dropZone.classList.add('drag-over')));
+['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev,()=>dropZone.classList.remove('drag-over')));
+dropZone.addEventListener('drop',e=>handleFiles(e.dataTransfer.files));fileInput.addEventListener('change',e=>handleFiles(e.target.files));
+async function handleFiles(files){const restName=document.getElementById('restaurant-name').value;if(!restName){showToast("⚠️ DEFINE EL COMERCIO");return}if(!files[0])return;const startTime=performance.now();document.getElementById('app-view').classList.add('hidden');document.getElementById('loading-space-view').classList.remove('hidden');warpSpeed=190;const file=files[0];const reader=new FileReader();reader.onload=async(evt)=>{const base64=evt.target.result.split(',')[1];updateProgress(15,"Capturando Nombres y Precios EXACTOS...");const data=await analyzeIA(base64,file.type);if(data){menuData=data;const allItems=[...(menuData.platos||[]),...(menuData.bebidas||[])];for(let i=0;i<allItems.length;i++){const progress=15+((i+1)/allItems.length*85);const itemName=(allItems[i].nombre||"Producto").substring(0,15);updateProgress(progress,`Renderizando Activo Sony Pro: ${itemName}...`);allItems[i].proImg=await generateSonyPhoto(allItems[i])}updateProgress(100,"Misión Completada con Éxito.");setTimeout(()=>{renderFinalTable();document.getElementById('loading-space-view').classList.add('hidden');document.getElementById('results-view').classList.remove('hidden');warpSpeed=1.0},1500)}};reader.readAsDataURL(file)}
+function updateProgress(val,text){document.getElementById('loading-bar').style.width=val+"%";document.getElementById('loading-perc').innerText=Math.round(val)+"%";document.getElementById('loading-status').innerText=text}
+async function analyzeIA(base64,mimeType){const prompt=`Analiza este menú de forma LITERAL. Clasifica platos y bebidas. REGLAS: PRECIO: valor numérico absoluto. NOMBRE: MÁXIMO 5 PALABRAS. CORREDOR: categoría única MÁXIMO 3 PALABRAS. DESCRIPCIÓN: MÁXIMO 40 PALABRAS. ELECCIONES,AGREGAR,QUITAR: usa N/A si no hay info. JSON: {"platos":[...],"bebidas":[...]}`;const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;try{const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt},{inlineData:{mimeType,data:base64}}]}],generationConfig:{responseMimeType:"application/json"}})});const res=await response.json();return JSON.parse(res.candidates[0].content.parts[0].text)}catch(e){return null}}
+async function generateSonyPhoto(item){const name=item.nombre||(item.marca+' '+(item.sabor||''));const prompt=`High-end professional advertising food photography of ${name}. ${item.desc||''}. Sony A7R IV, 85mm lens, cinematic studio lighting, 1024x1024.`;const url=`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;try{const response=await fetch(url,{method:'POST',body:JSON.stringify({instances:[{prompt}],parameters:{sampleCount:1}})});const res=await response.json();return res.predictions[0].bytesBase64Encoded}catch(e){return null}}
+function renderFinalTable(){let html="";const build=(items,isB=false)=>{items.forEach(i=>{const itemName=i.nombre||(i.marca+' '+(i.sabor||''));const cat=isB?'BEBIDAS':(i.corredor||'PRODUCTO');html+=`<tr class="hover:bg-slate-50 transition-colors border-b border-slate-50"><td class="p-8 font-black text-slate-500 uppercase tracking-widest">${cat}</td><td class="p-8 font-black text-rappi uppercase italic leading-tight">${itemName}</td><td class="p-8 text-slate-500 italic leading-relaxed text-[11px]">${i.desc||i.descripcion}</td><td class="p-8 font-black text-slate-800">$${(i.precio||0).toLocaleString()}</td><td class="p-8 text-slate-400 font-bold uppercase text-[9px]">${i.elecciones||'N/A'}</td><td class="p-8 text-slate-400 font-bold uppercase text-[9px]">${i.agregar||'N/A'}</td><td class="p-8 text-slate-400 font-bold uppercase text-[9px]">${i.quitar||'N/A'}</td></tr>`})};build(menuData.platos);build(menuData.bebidas,true);document.getElementById('table-body').innerHTML=html}
+document.getElementById('btn-download-zip').addEventListener('click',async()=>{const zip=new JSZip();const restName=(document.getElementById('restaurant-name').value||'Restaurante').replace(/\s+/g,'_');const all=[...(menuData.platos||[]),...(menuData.bebidas||[])];showToast("📦 EMPAQUETANDO");all.forEach(i=>{if(i.proImg){const name=(i.nombre||(i.marca+'_'+(i.sabor||''))).trim();zip.file(`${name}.png`,i.proImg,{base64:true})}});zip.generateAsync({type:"blob"}).then(function(content){saveAs(content,`ACTIVOS_VISUALES_${restName.toUpperCase()}.zip`);showToast("✅ DESCARGA LISTA")})});
+document.getElementById('btn-copy').addEventListener('click',()=>{let tsv="";const add=(items,isB=false)=>items.forEach(p=>{const cat=isB?'BEBIDAS':(p.corredor||'PRODUCTO');const name=p.nombre||(p.marca+' '+(p.sabor||''));tsv+=`${cat}\t${name}\t${p.desc||p.descripcion}\t${p.precio}\t${p.elecciones||'N/A'}\t${p.agregar||'N/A'}\t${p.quitar||'N/A'}\n`});add(menuData.platos);add(menuData.bebidas,true);const el=document.createElement('textarea');el.value=tsv;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);showToast("✨ DATOS COPIADOS")});
+function showToast(text){const t=document.getElementById('toast-msg');t.innerText=text;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000)}
+window.onload=init3D;window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight)});
+</script>
+</body>
+</html>
